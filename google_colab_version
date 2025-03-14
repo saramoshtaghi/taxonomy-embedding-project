@@ -1,0 +1,120 @@
+pip install kaggle
+import kagglehub
+
+# Download latest version
+path = kagglehub.dataset_download("alvations/google-product-taxonomy")
+
+print("Path to dataset files:", path)
+
+import pandas as pd
+
+# Load the dataset
+taxonomy_path = "/content/taxonomy_edges.csv"  # Update with actual path
+df = pd.read_csv(taxonomy_path)
+
+# Display sample rows
+df.head()
+
+import networkx as nx
+
+# Create a directed graph
+G = nx.DiGraph()
+
+# Add edges from taxonomy
+for _, row in df.iterrows():
+    G.add_edge(row["Parent"], row["Child"])
+
+# Print graph summary
+print(f"Graph has {G.number_of_nodes()} nodes and {G.number_of_edges()} edges.")
+
+from node2vec import Node2Vec
+
+# Train Node2Vec
+node2vec = Node2Vec(G, dimensions=64, walk_length=10, num_walks=100, workers=4)
+model = node2vec.fit(window=5, min_count=1, batch_words=4)
+
+# Save embeddings
+model.wv.save_word2vec_format("taxonomy_embeddings.txt")
+
+# Example: Print embedding for "Milk"
+print("Milk embedding:", model.wv["Milk"])
+
+from gensim.models import FastText
+
+# Prepare sentences (Simulated descriptions for now)
+sentences = [
+    ["Milk", "Dairy", "Fresh", "Organic"],
+    ["Cheddar", "Cheese", "Dairy"],
+    ["Bananas", "Fruits"]
+]
+
+# Train FastText model
+fasttext_model = FastText(sentences, vector_size=64, window=3, min_count=1, sg=1)
+
+# Save embeddings
+fasttext_model.wv.save("fasttext_embeddings.bin")
+
+# Example: Print embedding for "Milk"
+print("Milk embedding (FastText):", fasttext_model.wv["Milk"])
+
+
+import numpy as np
+
+def merge_embeddings(graph_emb, text_emb, alpha=0.5):
+    merged = {}
+    for word in graph_emb.wv.index_to_key:
+        if word in text_emb.wv:
+            merged[word] = alpha * np.array(graph_emb.wv[word]) + (1 - alpha) * np.array(text_emb.wv[word])
+        else:
+            merged[word] = graph_emb.wv[word]  # Use graph if no text embedding
+    return merged
+
+hybrid_embeddings = merge_embeddings(model, fasttext_model, alpha=0.7)
+
+# Example: Print merged embedding for "Milk"
+print("Hybrid embedding for 'Milk':", hybrid_embeddings["Milk"])
+
+from sklearn.metrics.pairwise import cosine_similarity
+
+def similarity(embeddings, word1, word2):
+    return cosine_similarity([embeddings[word1]], [embeddings[word2]])[0][0]
+
+print("Similarity (Milk, Dairy):", similarity(hybrid_embeddings, "Milk", "Dairy"))
+
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
+
+# Reduce dimensionality
+words = list(hybrid_embeddings.keys())
+vectors = np.array([hybrid_embeddings[word] for word in words])
+
+perplexity = min(5, len(words) - 1)
+tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42)
+reduced = tsne.fit_transform(vectors)
+
+# Plot
+plt.figure(figsize=(8,6))
+plt.scatter(reduced[:,0], reduced[:,1], color="blue")
+
+# Annotate
+for i, word in enumerate(words):
+    plt.annotate(word, (reduced[i,0], reduced[i,1]))
+
+plt.title("t-SNE Visualization of Taxonomy-Based Embeddings")
+plt.show()
+
+
+from sklearn.neighbors import NearestNeighbors
+
+def get_recommendations(embeddings, product, k=3):
+    words = list(embeddings.keys())
+    vectors = np.array([embeddings[word] for word in words])
+
+    knn = NearestNeighbors(n_neighbors=k, metric="cosine").fit(vectors)
+    distances, indices = knn.kneighbors([embeddings[product]])
+
+    return [words[i] for i in indices[0]]
+
+print("Recommendations for 'Milk':", get_recommendations(hybrid_embeddings, "Milk"))
+
+
