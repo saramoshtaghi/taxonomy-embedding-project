@@ -34,5 +34,6 @@ accuracy.
 
 ## 📂 Project Structure
 
+taxonomy-embedding-project/ │── data/ # Store dataset files │── models/ # Trained embedding models │── src/ # Source code │ ├── main.py # Main script │ ├── preprocess.py # Data processing functions │ ├── train_graph.py # Train Node2Vec embeddings │ ├── train_nlp.py # Train FastText embeddings │ ├── hybrid_embeddings.py # Merge Graph & NLP embeddings │ ├── evaluate.py # Evaluation metrics │── README.md # Documentation │── requirements.txt # Dependencies │── .gitignore # Ignore unnecessary files
 
 
