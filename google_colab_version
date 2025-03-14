@@ -1,3 +1,5 @@
+#This version is straightforward and clear while still covering all the key points about the project
+
 pip install kaggle
 import kagglehub
 
